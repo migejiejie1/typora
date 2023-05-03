@@ -1,0 +1,55 @@
+```shell
+Jenkins 的所有重要数据都存放在它的主目录中，即 JENKINS_HOME。
+
+1、JENKINS_HOME
+默认位于当前用户主目录下的 .jenkins 隐藏目录中，即 ~/.jenkins。
+可通过修改环境变量 JENKINS_HOME 的值，来更改 jenkins 主目录。
+其中存储了关于构建服务器的配置信息、构建作业、构建产物、插件和其它有用的信息。
+这个目录将会占用大量的磁盘空间。
+
+2、JENKINS_HOME 目录结构
+.jenkins：
+1) 目录
++ userContent：# 网上说是存放用户自己为 jenkins 服务器定制化的一些内容。这个目录默认是空的，只有一个readme文件。
++ workflow-libs: # 内部库, 这个内部库其实就是一个已经初始化且存在于Jenkins内部的Git仓库。
++ logs：# 日志目录
++ secrets: # 存放一些密钥凭证
++ caches: # 缓存目录包含与Jenkin作业中配置的git存储库相关的数据。Jenkins将在您执行构建时再次缓存数据，这取决于那些构建中使用的存储库，方法是利用每个作业的config.xml文件。
++ war: # 存放扩展的 web 应用程序，当以单机应用程序的形式运行 jenkins 时，会把 web 应用程序解压到这个目录。
++ updates：# 存放可用的插件更新
++ nodes: # Agent(slave) 的配置
++ plugins：# 存放所有已安装的插件（下载的推荐插件都在这个目录下存放）, 更新 jenkins 不需要重新安装插件
++ fingerprints:  # 跟踪人工操作的痕迹
++ users：# 当使用 jenkins 本地用户数据库时，用户信息会存放在这个目录下
++ workspace：# 存放Jenkins配置的job中相关的文件和中间产物 
+             # jenkins 对当前作业进行构建的地方, 包含 jenkins 检验过的源码、构建本身生成的所有文件  
++ jobs：# 构建作业的配置细节，及构建产物和数据
+  - jobs/YOUR_JOB_NAME/: # 每个job的子目录
+  
+  - jobs/YOUR_JOB_NAME/config.xml: # 存放当前作业的所有配置细节
+  - jobs/YOUR_JOB_NAME/nextBuildNumber：# 下一次构建的 number 号
+  - jobs/YOUR_JOB_NAME/builds/	# 包含当前作业的构建历史
+  
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/ # 当前作业的构建历史
+  - jobs/YOUR_JOB_NAME/builds/legacyIds # 旧版 ID
+  - jobs/YOUR_JOB_NAME/builds/permalinks # 永久链接
+    lastCompletedBuild 200 # 最后完成构建
+    lastFailedBuild 183 # 最后失败构建
+    lastStableBuild 200 # 上一个稳定版本
+    lastSuccessfulBuild 200 # 上次成功构建
+    lastUnstableBuild -1 # 最后不稳定构建
+    lastUnsuccessfulBuild 183 # 上次不成功构建
+
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/workflow/ # 工作流
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/libs/
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/build.xml # 每个 BUILD_NUMBER 的编译结果
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/log	# 每个 BUILD_NUMBER 的编译日志
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/log-index # 
+  - jobs/YOUR_JOB_NAME/builds/BUILD_NUMBER/changelog.xml # 每个BUILD_NUMBER的Changelog
+ 
+2) 文件
++ config.xml：# jenkins 的核心配置文件
++ hudson.tasks.Maven.xml： # Maven 的安装细节
++ ....xml： # 其它各种工具的配置信息
+```
+

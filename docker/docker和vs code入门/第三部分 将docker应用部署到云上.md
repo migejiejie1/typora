@@ -1,0 +1,1 @@
+[教程：将 Docker 应用部署到 Azure | Microsoft Learn](https://learn.microsoft.com/zh-cn/visualstudio/docker/tutorials/tutorial-deploy-docker-app-azure)

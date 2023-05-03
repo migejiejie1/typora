@@ -1,0 +1,566 @@
+```
+https://juejin.cn/post/6961577394796757006
+```
+
+## 1 Pipeline
+
+### 1.1 Pipeline定义
+
+Pipeline是通过Jenkinsfile描述的流水线，安装声明式插件Pipeline：Declarative
+
+Jenkensfile的组成：
+
+- 指定node节点/workspace
+- 指定运行选项
+- 指定stages阶段
+- 指定构建后操作
+
+### 1.2 Pipeline语法
+
+#### 1.2.1 **agent**指定node节点/workspace
+
+可选参数：
+
+- any表示任何可用的节点上执行pipeline
+- none为agent的默认值
+- label表示在指定节点上运行
+- node表示允许额外的选项
+
+```pipeline
+agent {
+    node {
+        label "master" // 指定运行节点的标签或名称
+        customWorkspace "${workspace}" // 指定运行的工作目录（可选）
+    }
+}
+复制代码
+```
+
+#### 1.2.2 **options**指定运行选项
+
+options指令允许从流水线内部配置特定的流水线选项，也可以由插件提供：
+
+- buildDiscarder：为最近的流水线运行的特定数量保存组件和控制台输出
+- disableConcurrentBuilds：不允许同时执行流水线，可防止同时访问共享资源
+- overriderIndexTriggers：允许覆盖分支索引触发器的默认处理
+- timeout：设置超时时间
+- retry：失败后重新尝试的次数
+- skipStagesAfterUnstable：一旦构建状态变为UNSTABLE，就跳过该阶段
+
+```pipeline
+options {
+    timestamps() // 在日志中打印时间
+    skipDefaultCheckout() // 删除隐式的checkout scm 语句
+    disableCouncurrentBuilds() // 禁止并行
+    timeout(time:1, unit:'HOURS') // 流水线超时设置为1H
+}
+复制代码
+```
+
+#### 1.2.3 **stages**指定stages阶段
+
+包含了一个或多个stage指令，用于连接交付过程中每个离散的部分
+
+```pipeline
+stages{
+    stage("PullCode") { // 阶段名称
+        steps { // 步骤
+            timeout(time:5, unit:'MINUTES') { // 指定步骤的超时时间
+                script { // 指定运行的脚本
+                    println("获取代码")
+                }
+            }
+        }
+    }
+    stage("Build") { // 阶段名称
+        steps { // 步骤
+            timeout(time:20, unit:'MINUTES') { // 指定步骤的超时时间
+                script { // 指定运行的脚本
+                    println("应用打包")
+                }
+            }
+        }
+    }
+    stage("CodeScan") { // 阶段名称
+        steps { // 步骤
+            timeout(time:30, unit:'MINUTES') { // 指定步骤的超时时间
+                script { // 指定运行的脚本
+                    println("代码扫描")
+                }
+            }
+        }
+    }
+}
+复制代码
+```
+
+#### 1.2.4 **post**指定构建后操作
+
+post-condition块：
+
+- always{}：总是执行
+- success{}：成功后执行
+- failure{}：失败后执行
+- aborted{}：取消后执行
+- changed{}：当流水线或阶段完成状态和之前不同时执行
+- unstable{}：当流水线或阶段状态为unstable时执行
+
+```pipeline
+post {
+    always {
+        println("总是执行")
+    }
+    success {
+        script {
+            // currentBuild是一个全局变量
+            // description是构建描述
+            currentBuild.description += "\n 构建成功！"
+        }
+    }
+    failure {
+        script {
+            currentBuild.description += "\n 构建失败！"
+        }
+    }
+    aborted {
+        script {
+            currentBuild.description += "\n 构建取消！"
+        }
+    }
+}
+复制代码
+```
+
+#### 1.2.5 **enviroment环境变量**
+
+用于指定一个键值对序列，用于定义所有/特定阶段步骤的环境变量，取决于environment定义的位置。支持credentials()方法，用于通过标识符访问jenkins预定义的凭证。相当于定义一个变量，可以在后续使用
+
+```pipeline
+pipeline {
+    agent any
+    enviroment {
+        CC = 'clang'
+    }
+    stages {
+        stage("example") {
+            enviroment {
+                ACC_KEY = credentails("my-secret-text")
+            }
+            steps {
+                sh 'printenv'
+            }
+        }
+    }
+}
+复制代码
+```
+
+#### 1.2.6 **parameter**参数
+
+为流水线运行时设置项目相关的参数
+
+```pipeline
+parameters {
+    string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: '')
+    booleanParam(name: 'DEBUG_BUILD', defaultValue: true, descrptio: '')
+}
+复制代码
+```
+
+#### 1.2.7 **trigger**触发器
+
+构建触发器：
+
+- cron计划任务定期执行构建：`triggers{cron('H */4 * * 1-5')}`
+- pollSCM与cron类型，由jenkins定期检测源码变化：`triggers{pollSCM('H */4 * * 1-5')}`
+- upstream接受都好分割的工作字符串和阈值，当字符串中任何作业以最小阈值结束时，流水线被重新触发
+
+#### 1.2.8 **input**人工确认
+
+input由人工确认是否继续进行
+
+- message：呈现给用户的提示信息
+- id可选默认为stage名称
+- ok默认表单的ok文本
+- submitter：可选，逗号分隔的用户列表或允许提交的外部组名，默认允许任何用户
+- parameter：提示提交者提供一个可选的参数列表
+
+示例：
+
+```pipeline
+pipeline {
+    agent any
+
+    stages {
+        stage('SayHello') {
+            input {
+                message "Should we continue"
+                ok "Yes, we should"
+                submitter "xd1998"
+                parameters {
+                    string(name: "PERSON", defaultValue: "JXD", description: "Who are you?")
+                }
+            }
+            steps {
+                echo "Hello ${PERSON}"
+            }
+        }
+    }
+}
+```
+
+![image-20221228201351099](../Image/image-20221228201351099.png)
+
+![image-20221228201404648](../Image/image-20221228201404648.png)
+
+#### 1.2.9 when语法
+
+放置在stage中，条件为true，stage执行。
+
+- branch：构建的分支和给定的分支匹配则执行，适用于多分支流水线：`when {branch 'master'}`
+- environment：指定环境变量是给定值执行：`when {environment name: 'DEPLOY_TO', value:'prooduction'}`
+- expression：当指定的Groovy表达式评估为true时才执行：`when {expression {return params.DEBUG_BUILD}}` when语法根据参数值跳过执行的阶段
+- not：当嵌套条件为false时执行：`when {not {branch 'master'}}`
+- allOf：当所有嵌套条件都为true才执行：`when {allOf {branch 'master'; environment name: 'DEPLOY_TO, value: 'production}}`
+- anyOf：当至少有一个嵌套条件为true时执行
+
+```typescript
+pipeline {
+    agent any
+    parameters {
+        string(name: "PERSON", defaultValue: "JXD", description: "Who are you?")
+    }
+    stages{
+        stage('SayHello') {
+            input {
+                message "Should we continue"
+                ok "Yes, we should"
+                submitter "xd1998"
+            }
+            steps {
+                echo "Hello ${PERSON}"
+            }
+        }
+        stage("PullCode") { // 阶段名称
+            steps { // 步骤
+                timeout(time:5, unit:'MINUTES') { // 指定步骤的超时时间
+                    script { // 指定运行的脚本
+                        println("获取代码")
+                    }
+                }
+            }
+        }
+        stage("Build") { // 阶段名称
+            steps { // 步骤
+                timeout(time:20, unit:'MINUTES') { // 指定步骤的超时时间
+                    script { // 指定运行的脚本
+                        println("应用打包")
+                    }
+                }
+            }
+        }
+        stage("CodeScan") { // 阶段名称
+            when {
+                environment name: "PERSON",
+                value: 'JXD'
+            }
+            steps { // 步骤
+                timeout(time:30, unit:'MINUTES') { // 指定步骤的超时时间
+                    script { // 指定运行的脚本
+                        println("代码扫描")
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+![image-20221228201426208](../Image/image-20221228201426208.png)
+
+![image-20221228201433660](../Image/image-20221228201433660.png)
+
+## 2 Jenkins Share Library
+
+src目录类似于标准的Java src目录结构，执行流水线时，将这个目录添加到类路径，vars目录托管脚本文件，这些脚本文件在管道中作为变量公开。resource目录允许libraryResource从外部库使用步骤来加载相关联的非Groovy文件。
+
+```python
+(root)
+- src  # Groovy源文件
+|    -org
+|        -foo
+|            -Bar.groovy    # org.foo.Bar 类
+- vars
+|    -foo.groovy    # 全局的foo变量
+|    -foo.txt    # foo变量的help
+- resources    # 源文件（外部库）
+|    -org
+|        -foo
+|            -bar.json     # org.foo.Bar的静态helper数据
+复制代码
+```
+
+### 2.1 创建自己的共享库
+
+在github中新建仓库，在src/org/devops下创建文件，定义共享方法
+
+```groovy
+package org.devops
+// 打印内容
+def PrintMes(content) {
+  println(content)
+}
+```
+
+![image-20221228201452750](../Image/image-20221228201452750.png)
+
+### 2.2 在Jenkins中配置共享库
+
+先设置共享库的名称，后续在pipeline中通过@Library或者Library{}指定共享库。根据github的分支名称指定默认的版本 
+
+![image-20221228201508581](../Image/image-20221228201508581.png)
+
+设置共享库中的源码管理
+
+![image-20221228201521524](../Image/image-20221228201521524.png)
+
+### 2.3 在流水线中使用共享库
+
+```typescript
+#!groovy
+@Library('jenkinslib') _
+def tools = new org.devops.tools()
+
+String workspace = "/opt/jenkins/workspace"
+
+pipeline {
+    agent {
+        node {
+            label "master"
+            customWorkspace "${workspace}"
+        }
+    }
+    parameters {
+        string(name: "PERSON", defaultValue: "JXD", description: "Who are you?")
+    }
+    stages{
+        stage('SayHello') {
+            input {
+                message "Should we continue"
+                ok "Yes, we should"
+                submitter "xd1998"
+            }
+            steps {
+                echo "Hello ${PERSON}"
+            }
+        }
+        stage("PullCode") { // 阶段名称
+            steps { // 步骤
+                timeout(time:5, unit:'MINUTES') { // 指定步骤的超时时间
+                    script { // 指定运行的脚本
+                        println("获取代码")
+                    }
+                }
+            }
+        }
+        stage("Build") { // 阶段名称
+            steps { // 步骤
+                timeout(time:20, unit:'MINUTES') { // 指定步骤的超时时间
+                    script { // 指定运行的脚本
+                        println("应用打包")
+                    }
+                }
+            }
+        }
+        stage("CodeScan") { // 阶段名称
+            when {
+                environment name: "PERSON",
+                value: 'JXD'
+            }
+            steps { // 步骤
+                timeout(time:30, unit:'MINUTES') { // 指定步骤的超时时间
+                    script { // 指定运行的脚本
+                        println("代码扫描")
+                        tools.PrintMes('this is mylib')
+                    }
+                }
+            }
+        }
+    }
+}
+复制代码
+```
+
+![image-20221228201538890](../Image/image-20221228201538890.png)
+
+## 3 Groovy
+
+Groovy是功能强大可选类型的动态语言，支持Java平台，可以与Java集成，提供脚本编写、特定领域语言编写、运行时和编译时元编程及函数式编程。
+
+### 3.1 安装Groovy
+
+1. 下载Groovy安装包
+2. 解压安装包
+3. 获取bin目录
+4. 将bin写入/etc/profile文件
+
+```bash
+export GROOVY_HOME=/opt/groovy
+export PATH=$PATH:$GROOVY_HOME/bin
+复制代码
+```
+
+1. 生效：source /etc/profile
+2. 启动Groovy IDE：`groovyconsole`
+
+### 3.2 Groovy基础
+
+**数据类型String常用方法：**
+
+- contains()是否包含特定内容
+- size() length()字符串长度
+- toString()转为string类型
+- indexOf()元素索引
+- endWith()是否指定字符结尾
+- minus() plus() 增加去掉字符串
+- reverse() 反向排序
+- substring(1,2)取子字符串
+- toUpperCase() toLowerCase() 大小写转换
+- split() 切分字符串 单引号引用普通字符串，双引号相当于模板字符串可以使用`${}`引用变量
+
+**数据类型List常用方法：**
+
+- \+ - += -= 增删元素
+- add() 添加元素
+- isEmpty() 判空
+- intersect() disjoint() 取交集、判断是否有交际
+- flatten() 扁平化列表
+- unique() 去重
+- reverse() sort() 反转 排序
+- count() 个数
+- join() 连接
+- sum() min() max() 求和、最值
+- contains() 包含特定元素
+- remove() removeAll()
+- each() 遍历
+
+**定义函数**
+
+```scss
+def PrintMessage(message) {
+    println(message)
+}
+复制代码
+```
+
+**补充：常用的Pipeline DSL**
+
+1. readJSON
+2. checkout
+3. publishHTML
+4. input
+5. credentials
+6. httpRequest
+7. email
+
+## 4 Jenkins工具集成
+
+### 4.1 Maven集成
+
+集成Maven、Gradle、Ant过程类似：下载压缩包，解压缩，找到bin目录，配置环境变量，让环境变量生效。在全局工具配置中配置home的位置（如果没找到配置的地方就安装插件），在pipeline中定义一个变量等于tool + "name" ，后续使用变量即可。
+
+![image-20221228201602991](../Image/image-20221228201602991.png)
+
+在github中新增jenkinsfile
+
+```javascript
+pipeline {
+  agent { 
+    node { 
+      label "master"
+    }
+  }
+  stages {
+    stage("build") {
+      steps {
+        script {
+          mvnHome = tool "maven3.6.3"
+          sh "${mvnHome}/bin/mvn -v"
+        }
+      }
+    }
+  }
+}
+复制代码
+```
+
+从SCM中配置流水线
+
+![image-20221228201617668](../Image/image-20221228201617668.png)
+
+执行流水线，执行成功
+
+![image-20221228201630409](../Image/image-20221228201630409.png)
+
+### 4.2 NPM集成
+
+1. 安装node
+2. 在全局工具配置中配置home的位置
+3. 遇到一个报错：`/usr/bin/env: node: No such file or directory`，解决方法：添加软连接`ln -s /usr/local/NODEJS_HOME/bin/node /usr/bin/node`
+
+![image-20221228201647342](../Image/image-20221228201647342.png)
+
+### 4.3 使用共享库整合构建工具
+
+![image-20221228201703380](../Image/image-20221228201703380.png)
+
+### 4.4 Ansible集成
+
+1. 安装ansible
+2. 配置ssh
+3. 配置servers
+
+![image-20221228201718782](../Image/image-20221228201718782.png)
+
+1. 将Ansible添加到流水线中
+
+```dart
+#!groovy
+@Library('jenkinslib') _
+def build = new org.devops.build()
+def deploy = new org.devops.deploy()
+String buildShell = "${env.buildShell}"
+String buildType = "${env.buildType}"
+String deployHosts = "${env.deployHosts}"
+pipeline {
+  agent { 
+    node { 
+      label "master"
+    }
+  }
+   
+  stages {
+    stage("build") {
+      steps {
+        script {
+          build.Build(buildType, buildShell)
+          deploy.AnsibleDeploy("${deployHosts}", "-m ping")
+        }
+      }
+    }
+  }
+}
+复制代码
+```
+
+引入的共享库：`@Library('jenkinslib') _`
+
+```kotlin
+package org.devops
+
+def AnsibleDeploy(hosts, func) {
+  sh "ansible ${func} ${hosts}"
+}
+```
+
+![image-20221228201736097](../Image/image-20221228201736097.png)
