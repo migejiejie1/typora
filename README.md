@@ -1,2 +1,0 @@
-# typora
-typora仓库
